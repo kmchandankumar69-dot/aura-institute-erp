@@ -1,0 +1,15 @@
+import mongoose, { Schema } from 'mongoose'
+
+const ExamSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true }, date: { type: Date, required: true }, subject: { type: String, required: true, trim: true }, time: String, venue: String, semester: Number }, { timestamps: true })
+const GradeSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true }, semester: { type: Number, required: true }, sgpa: { type: Number, min: 0, max: 10, required: true }, courses: [{ code: String, name: String, credits: Number, grade: String, marks: Number }] }, { timestamps: true })
+GradeSchema.index({ userId: 1, semester: 1 }, { unique: true })
+const StudentCgpaSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true }, semester: { type: Number, required: true, min: 1, max: 20 }, cgpa: { type: Number, required: true, min: 0, max: 10 }, updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true } }, { timestamps: true })
+StudentCgpaSchema.index({ userId: 1, semester: 1 }, { unique: true })
+const RevaluationSchema = new Schema({ subjectId: { type: Schema.Types.ObjectId, ref: 'RevaluationSubject' }, userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true }, course: { type: String, required: true, trim: true }, reason: { type: String, required: true, trim: true }, status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING', index: true }, reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' }, reviewedAt: Date }, { timestamps: true })
+RevaluationSchema.index({ userId: 1, course: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'PENDING' } })
+const NoticeSchema = new Schema({ title: { type: String, required: true, trim: true }, body: { type: String, required: true, trim: true }, audience: { type: String, enum: ['ALL', 'STUDENT', 'FACULTY'], default: 'ALL', index: true }, publishedAt: { type: Date, default: Date.now, index: true }, publishedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true } }, { timestamps: true })
+export const Exam = mongoose.models.Exam || mongoose.model('Exam', ExamSchema)
+export const Grade = mongoose.models.Grade || mongoose.model('Grade', GradeSchema)
+export const StudentCgpa = mongoose.models.StudentCgpa || mongoose.model('StudentCgpa', StudentCgpaSchema)
+export const Revaluation = mongoose.models.Revaluation || mongoose.model('Revaluation', RevaluationSchema)
+export const Notice = mongoose.models.Notice || mongoose.model('Notice', NoticeSchema)

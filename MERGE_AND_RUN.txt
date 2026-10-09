@@ -1,0 +1,34 @@
+AURA INSTITUTE ERP - CORRECT MERGED BUILD
+
+This build merges the 15-file Next ERP upgrade patch into the current source.
+
+IMPORTANT: The .next\static and public xcopy commands are deployment steps only.
+They do NOT install source features. The source merge is already included in this ZIP.
+
+1. Copy your existing .env.local into this project folder.
+2. Run:
+   npm install
+   npm run typecheck
+   npm run build
+3. For standalone deployment run:
+   xcopy /E /I /Y .next\static .next\standalone\.next\static
+   xcopy /E /I /Y public .next\standalone\public
+4. Run:
+   node .next\standalone\server.js
+5. Open http://localhost:3000/portal
+
+Student features:
+- Digital Student ID download
+- Admission progress tracker
+- Notifications
+- Current semester and CGPA information
+- Placement semester + CGPA eligibility
+
+Admin features:
+- Admin dashboard/statistics
+- Activity/audit log
+- Event registration table + CSV export
+- CGPA management
+- Placement management + applicant status workflow
+
+Admission document management is intentionally NOT included.

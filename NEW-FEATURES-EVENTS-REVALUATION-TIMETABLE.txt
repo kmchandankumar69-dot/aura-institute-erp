@@ -1,0 +1,15 @@
+AURA ERP - Events, Revaluation Subjects and Examination Timetable Upgrade
+
+Added:
+1. Admin-only Event Management: add, edit, delete events.
+2. Admin-only Revaluation Subject Management: add, edit, enable/disable, delete subjects.
+3. Student revaluation now uses active database subjects and requires a reason.
+4. Admin-only Examination Timetable Management: add, edit, delete entries with semester, date, time, Theory/Practical and 1st/2nd/3rd Internal/Main Exam.
+5. Student timetable is filtered by the student's current semester.
+6. Student can use "Download timetable PDF"; the browser print dialog opens and the student can choose "Save as PDF" for a real PDF.
+7. Admin actions are recorded in the existing audit log.
+
+Important:
+- Feature 6 from the earlier scope (Admission Document Management) remains excluded.
+- Existing .env.local is intentionally not included. Copy the .env.local from your working project into this project folder.
+- Existing MongoDB data is preserved. New RevaluationSubject and Timetable collections are created automatically when used.
