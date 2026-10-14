@@ -1,5 +1,5 @@
 'use client'
-
+import QRCode from 'qrcode'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -144,6 +144,7 @@ function Student({ data, events, placements, revaluationSubjects, timetable }: {
     <div className="portal-card"><h3>Academic performance</h3><div className="big-number">{data?.currentCgpa?.cgpa ?? latestSgpa ?? '—'}</div><p>{data?.currentCgpa?.source === 'ADMIN' ? `Official CGPA · Semester ${data.currentCgpa.semester}` : 'Current CGPA calculated from recorded SGPAs'}</p>{(data?.cgpaHistory || []).length ? <div className="cgpa-history">{data.cgpaHistory.map((record:any) => <span key={record._id}>Sem {record.semester}: <b>{record.cgpa}</b></span>)}</div> : null}</div>
     <div className="portal-card"><h3>Revaluation request</h3><p className="muted">Choose an active subject and explain why you want the paper revalued.</p><select value={subjectId} onChange={e => { setSubjectId(e.target.value); const s = revaluationSubjects.find(x => x._id === e.target.value); setCourse(s ? `${s.name} (${s.code})` : '') }}><option value="">Select subject</option>{revaluationSubjects.filter(s => !data?.currentSemester || s.semester === data.currentSemester).map(s => <option key={s._id} value={s._id}>{s.name} ({s.code}) · Semester {s.semester}</option>)}</select><textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Explain the reason for your revaluation request"/><button className="btn primary" onClick={submitRevaluation} disabled={!subjectId || reason.trim().length < 10}>Submit request</button>{msg && <small>{msg}</small>}</div>
     <StudentTimetable timetable={timetable} semester={data?.currentSemester} />
+    <StudentHallTicket data={data} timetable={timetable} semester={data?.currentSemester} />
     <div className="portal-card full"><h3>Cultural & campus events — registration</h3>{events.length ? events.map(event => <div className="application-row" key={event._id}><div><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {event.time || 'Time TBA'} · {event.venue || 'Venue TBA'}</small></div><div><button className="btn secondary" disabled={registering === event._id} onClick={() => registerEvent(event._id)}>{registering === event._id ? 'Registering…' : 'Register'}</button><small>{eventMsg[event._id] || `${event.registeredCount}/${event.capacity} seats`}</small></div></div>) : <p>No active events.</p>}</div>
     <div className="portal-card full"><h3>Placement Cell</h3><p className="muted">Apply only when you meet both the CGPA and semester criteria. Admin selection updates your status here.</p>{placements.length ? placements.map(p => <div className="placement-row" key={p._id}><div><strong>{p.companyName} — {p.jobRole}</strong><small>Salary: {p.salary} · Minimum CGPA: {p.minCgpa}</small><small>Eligible semesters: {p.eligibleSemesters?.length ? p.eligibleSemesters.join(', ') : 'All semesters'}</small><small>Skills: {p.skillsRequired?.join(', ') || 'As specified by recruiter'}</small>{p.applicationDeadline && <small>Deadline: {new Date(p.applicationDeadline).toLocaleDateString('en-IN')}</small>}{p.description && <p>{p.description}</p>}</div><div>{p.application ? <span className="status-pill">{p.application.status}</span> : <button className="btn secondary" disabled={p.eligibleByCgpa === false || p.eligibleBySemester === false} onClick={() => applyPlacement(p._id)}>{p.eligibleByCgpa === false ? `Need CGPA ${p.minCgpa}` : p.eligibleBySemester === false ? `Semester ${p.currentSemester || 'not set'} not eligible` : 'Apply'}</button>}{placementMsg[p._id] && <small>{placementMsg[p._id]}</small>}</div></div>) : <p>No placement opportunities are currently open.</p>}</div>
     <div className="portal-card full"><h3>Notifications <span className="notification-count">{(data?.notifications || []).filter((n:any) => !n.read).length || 0}</span></h3>{(data?.notifications || []).length ? data.notifications.map((n:any) => <div className="notice-item notification-item" key={n._id}><strong>{n.title}</strong><p>{n.message}</p><small>{new Date(n.createdAt).toLocaleString('en-IN')}</small></div>) : <p>No notifications.</p>}<button className="btn secondary" onClick={() => fetch('/api/student/notifications', { method: 'PATCH' })}>Mark all as read</button></div><div className="portal-card full"><h3>Academic notices</h3>{(data?.notices || []).length ? data.notices.map((n: any) => <div className="notice-item" key={n._id}><strong>{n.title}</strong><p>{n.body}</p></div>) : <p>No notices.</p>}</div>
@@ -426,7 +427,7 @@ function TimetableManager({ initial }: { initial: TimetableItem[] }) {
 function StudentTimetable({ timetable, semester }: { timetable: TimetableItem[]; semester?: number }) {
   function downloadPdf() {
     const rows = timetable.map(item => `<tr><td>${escapeHtml(item.subject)}</td><td>${escapeHtml(item.subjectCode)}</td><td>${new Date(item.examDate).toLocaleDateString('en-IN')}</td><td>${escapeHtml(item.startTime)} – ${escapeHtml(item.endTime)}</td><td>${item.examType}</td><td>${item.assessment.replaceAll('_',' ')}</td><td>${escapeHtml(item.venue || '—')}</td></tr>`).join('')
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aura Examination Timetable</title><style>@page{size:A4 landscape;margin:14mm}body{font-family:Arial,sans-serif;color:#111;margin:0}h1{margin:0 0 4px;color:#1e1b4b}h2{margin:0 0 16px;font-size:16px;color:#555}.meta{margin:16px 0;padding:12px;border:1px solid #ddd;border-radius:8px;background:#f7f7fb}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:9px;text-align:left;font-size:11px}th{background:#ecebff}.foot{margin-top:18px;font-size:10px;color:#666}@media print{.no-print{display:none}}</style></head><body><h1>AURA INSTITUTE OF TECHNOLOGY</h1><h2>Examination Timetable</h2><div class="meta"><b>Semester:</b> ${semester || '—'} &nbsp; <b>Generated:</b> ${new Date().toLocaleString('en-IN')}</div><table><thead><tr><th>Subject</th><th>Code</th><th>Date</th><th>Time</th><th>Type</th><th>Examination</th><th>Venue</th></tr></thead><tbody>${rows || '<tr><td colspan="7">No timetable entries available.</td></tr>'}</tbody></table><div class="foot">Aura Institute of Technology · Examination Cell</div><script>window.onload=function(){window.print()}</script></body></html>`
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Aura Examination Timetable</title><style>@page{size:A4 landscape;margin:14mm}body{font-family:Arial,sans-serif;color:#111;margin:0}h1{margin:0 0 4px;color:#1e1b4b}h2{margin:0 0 16px;font-size:16px;color:#555}.meta{margin:16px 0;padding:12px;border:1px solid #ddd;border-radius:8px;background:#f7f7fb}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:9px;text-align:left;font-size:11px}th{background:#ecebff}.foot{margin-top:18px;font-size:10px;color:#666}@media print{.no-print{display:none}}</style></head><body><h1>AURA INSTITUTE OF TECHNOLOGY</h1><h2>Examination Timetable</h2><div class="meta"><b>Semester:</b> ${semester || '—'} &nbsp; <b>Generated:</b> ${new Date().toLocaleString('en-IN')}</div><table><thead><tr><th>Subject</th><th>Code</th><th>Date</th><th>Time</th><th>Type / Examination</th><th>Venue</th></tr></thead><tbody>${rows || '<tr><td colspan="7">No timetable entries available.</td></tr>'}</tbody></table><div class="foot">Aura Institute of Technology · Examination Cell</div><script>window.onload=function(){window.print()}</script></body></html>`
     const popup = window.open('', '_blank', 'width=1100,height=800')
     if (!popup) { window.alert('Please allow pop-ups to download the timetable as PDF.'); return }
     popup.document.write(html)
@@ -438,6 +439,87 @@ function StudentTimetable({ timetable, semester }: { timetable: TimetableItem[];
   </div>
 }
 
+function StudentHallTicket({ data, timetable, semester }: { data: any; timetable: TimetableItem[]; semester?: number }) {
+  const student = data?.user || {}
+  const approvedPhoto = typeof student.photoData === 'string' ? student.photoData : ''
+  const studentId = String(student.studentId || '')
+  const verifyUrl = typeof window !== 'undefined' && studentId
+    ? `${window.location.origin}/verify/${encodeURIComponent(studentId)}`
+    : ''
+  const canDownload = Boolean(student.name && studentId && approvedPhoto && timetable.length && semester)
+
+  async function downloadHallTicket() {
+    if (!canDownload || !verifyUrl) return
+
+    const popup = window.open('', '_blank', 'width=1000,height=900')
+    if (!popup) {
+      window.alert('Please allow pop-ups to generate your hall ticket.')
+      return
+    }
+
+    try {
+      // Generate the QR code locally and embed it as a data URL in the document.
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+        width: 320,
+        margin: 2,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#111827', light: '#FFFFFF' },
+      })
+
+      const esc = (value: any) => escapeHtml(value ?? '—')
+      const examRows = timetable
+        .slice()
+        .sort((a, b) => new Date(a.examDate).getTime() - new Date(b.examDate).getTime() || a.startTime.localeCompare(b.startTime))
+        .map((item, index) => `<tr><td>${index + 1}</td><td><strong>${esc(item.subject)}</strong><br><small>${esc(item.subjectCode)}</small></td><td>${esc(new Date(item.examDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}</td><td>${esc(item.startTime)} – ${esc(item.endTime)}</td><td>${esc(item.examType)}<br><small>${esc(item.assessment.replaceAll('_', ' '))}</small></td><td>${esc(item.venue || 'To be announced')}</td></tr>`)
+        .join('')
+
+      const html = `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aura Hall Ticket - ${esc(studentId)}</title>
+<style>
+*{box-sizing:border-box}@page{size:A4 portrait;margin:12mm}body{font-family:Arial,Helvetica,sans-serif;color:#172033;margin:0;background:#fff;font-size:11px}.ticket{width:100%;border:2px solid #25245a;padding:16px}.header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:3px solid #25245a;padding-bottom:12px}.brand{font-size:21px;font-weight:900;letter-spacing:.04em;color:#25245a}.sub{font-size:9px;letter-spacing:.17em;color:#596078;margin-top:4px}.tag{font-size:10px;font-weight:800;color:#25245a;border:1px solid #c6c6e4;padding:7px 9px;text-align:center}.title{text-align:center;margin:13px 0 14px}.title h2{font-size:17px;letter-spacing:.12em;margin:0;color:#25245a}.title p{margin:5px 0 0;color:#626b7e;font-size:10px}.profile{display:grid;grid-template-columns:1fr 112px;gap:15px;padding:12px;background:#f5f6fc;border:1px solid #d9dced}.identity{display:grid;grid-template-columns:1fr 1fr;gap:11px 18px;align-content:center}.field label{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#69718a;margin-bottom:4px}.field strong{font-size:12px;overflow-wrap:anywhere}.photo{width:105px;height:125px;border:1px solid #b7bdd1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}.photo img{width:100%;height:100%;object-fit:cover}.exam-heading{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px}.exam-heading h3{margin:0;color:#25245a;font-size:13px}.exam-heading span{font-size:9px;color:#596078}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9bfd0;padding:7px 5px;text-align:left;vertical-align:top;font-size:9px}th{background:#ececf8;color:#25245a;font-size:8px;text-transform:uppercase}td small{font-size:8px;color:#69718a}.notice{margin-top:11px;border:1px solid #e2d8b3;background:#fffaf0;padding:8px;font-size:9px;line-height:1.45}.bottom{display:grid;grid-template-columns:1fr 105px;gap:18px;align-items:end;margin-top:16px}.instructions h4{margin:0 0 5px;font-size:10px;color:#25245a}.instructions ul{margin:0;padding-left:15px;line-height:1.6;font-size:9px}.qrblock{text-align:center}.qr{width:84px;height:84px;object-fit:contain;border:1px solid #ddd;padding:3px;background:#fff}.qrlabel{font-size:8px;font-weight:800;letter-spacing:.06em;margin-top:4px}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px}.sign{border-top:1px solid #7e8495;padding-top:5px;text-align:center;font-size:8px;color:#596078}.footer{display:flex;justify-content:space-between;border-top:1px solid #d9dced;margin-top:14px;padding-top:7px;font-size:8px;color:#737b8d}.no-print{margin:0 0 10px;padding:10px;background:#f5f6fc;color:#25245a;font-size:12px}@media print{.no-print{display:none}.ticket{break-inside:avoid}}
+</style></head><body>
+<div class="no-print">In the print dialog, choose <b>Save as PDF</b> to save your hall ticket.</div>
+<main class="ticket"><header class="header"><div><div class="brand">AURA INSTITUTE OF TECHNOLOGY</div><div class="sub">EXAMINATION CELL · OFFICIAL STUDENT DOCUMENT</div></div><div class="tag">ADMIT CARD<br>SEMESTER ${esc(semester)}</div></header>
+<section class="title"><h2>EXAMINATION HALL TICKET</h2><p>Keep this hall ticket available for verification during examinations.</p></section>
+<section class="profile"><div class="identity"><div class="field"><label>Student Name</label><strong>${esc(student.name)}</strong></div><div class="field"><label>Student ID</label><strong>${esc(studentId)}</strong></div><div class="field"><label>Department</label><strong>${esc(student.department || data?.admission?.program || 'Not assigned')}</strong></div><div class="field"><label>Semester</label><strong>${esc(semester)}</strong></div><div class="field"><label>Academic Year / Intake</label><strong>${esc(data?.admission?.intake || new Date().getFullYear())}</strong></div><div class="field"><label>Hall Ticket Generated</label><strong>${esc(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}</strong></div></div><div class="photo"><img src="${approvedPhoto}" alt="Student photograph"></div></section>
+<div class="exam-heading"><h3>Examination Schedule</h3><span>${timetable.length} scheduled paper(s)</span></div><table><thead><tr><th>#</th><th>Subject / Code</th><th>Date</th><th>Time</th><th>Type / Examination</th><th>Venue</th></tr></thead><tbody>${examRows}</tbody></table>
+<div class="notice"><strong>Important:</strong> Verify all examination dates, times, subject codes and venues. Arrive before the scheduled start time and follow institute examination rules. Contact the Examination Cell if any detail is incorrect.</div>
+<section class="bottom"><div class="instructions"><h4>Candidate instructions</h4><ul><li>Carry this hall ticket and a valid institute identity card.</li><li>Follow the invigilator's instructions and examination regulations.</li><li>The QR code links to the institute's student verification page.</li></ul></div><div class="qrblock"><img class="qr" src="${qrDataUrl}" alt="Student verification QR code"><div class="qrlabel">SCAN TO VERIFY STUDENT</div></div></section>
+<div class="signatures"><div class="sign">Candidate signature</div><div class="sign">Examination Cell / Invigilator</div></div><footer class="footer"><span>Aura Institute of Technology · Examination Cell</span><span>Student ID: ${esc(studentId)}</span></footer></main>
+<script>
+(async function(){
+  const images = Array.from(document.images);
+  await Promise.all(images.map(img => {
+    if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+      setTimeout(resolve, 8000);
+    });
+  }));
+  window.focus();
+  window.print();
+})();
+</script></body></html>`
+
+      popup.document.open()
+      popup.document.write(html)
+      popup.document.close()
+    } catch (error) {
+      popup.close()
+      console.error('Hall ticket generation failed:', error)
+      window.alert('Could not generate the hall ticket. Please try again. If the problem continues, check the browser console.')
+    }
+  }
+
+  let reason = ''
+  if (!studentId) reason = 'Your student ID is not assigned yet.'
+  else if (!approvedPhoto) reason = 'An admin-approved student photo is required before generating the official hall ticket.'
+  else if (!semester) reason = 'Your current semester is not recorded yet.'
+  else if (!timetable.length) reason = 'No examination timetable is published for your current semester yet.'
+
+  return <div className="portal-card full"><div className="event-manager-heading"><div><h3>Download Examination Hall Ticket</h3><p className="muted">Generate a print-ready hall ticket with your verified photo, student identity, semester, QR verification and examination schedule.</p></div><span className="status-pill">Semester {semester || '—'}</span></div><div className="hall-ticket-summary"><div><strong>{student.name || 'Student'}</strong><small>{studentId || 'Student ID pending'} · {student.department || data?.admission?.program || 'Department not assigned'}</small><small>{timetable.length} examination(s) in the current semester</small></div>{approvedPhoto ? <img src={approvedPhoto} alt="Approved student photograph" /> : <div className="hall-ticket-no-photo">Photo<br/>required</div>}</div>{reason && <p className="muted">{reason}</p>}<button className="btn primary" onClick={downloadHallTicket} disabled={!canDownload}>Download hall ticket PDF</button><small className="muted">The browser print dialog opens. Choose “Save as PDF” to save the hall ticket as a PDF file.</small></div>
+}
 function escapeHtml(value: any) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c))
 }
