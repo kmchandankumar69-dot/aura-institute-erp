@@ -371,4 +371,3 @@ This project is intended for academic and educational purposes.
 ```
 
 
-If you want, I can also make it **more professional/portfolio-level**, with sections for **screenshots, features, database design, API modules, future enhancements, and project objectives**, so your GitHub repository looks like a proper final-year project rather than a code dump.
